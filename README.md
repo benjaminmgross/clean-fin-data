@@ -55,5 +55,6 @@ You probably need to execute the steps just covered.
 
 ##To Do 
 - Write the scrub functionality
-- Write the append functionality
+- ~~Write the append functionality~~
+- Consider writing to a log file that specifies all of the additions / changes / etc. that were accomplished in each function
 - Create some sort of testing mechanism to compare performance of read / write capacity of `cPickle` and `HDF5`.
