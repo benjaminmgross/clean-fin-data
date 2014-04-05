@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 # encoding: utf-8
+
 """
 .. module:: clean_fin_data.py
    :synopsis: Download, save, append, and scrub financial data
@@ -13,9 +14,57 @@ import pandas
 import numpy
 import pandas.io.data
 
-def save_data_to_hdf5(ticker_list, loc, start = '01/01/1990'):
+def __tickers_to_dict(ticker_list, start = '01/01/1990'):
     """
-    Initialization to pull down data, and store in ``HDF5`` file format
+    Utility function to return a dictionary of (ticker, price_df) mappings
+    """
+    reader = pandas.io.data.DataReader
+    d = {}
+    for ticker in ticker_list:
+        try:
+            d[ticker] = reader(ticker, 'yahoo', start = start)
+            print "worked for " + ticker
+        except:
+            print "failed for " + ticker
+    return d
+
+def append_store_prices(ticker_list, loc, start = '01/01/1990'):
+    """
+    Given an existing store located at ``loc``, check to make sure the
+    tickers in ``ticker_list`` are not already in the data set, and then
+    insert the tickers into the store.
+
+    :ARGS:
+
+        ticker_list: :class:`list` of tickers to add to the :class:`pandas.HDStore`
+
+        loc: :class:`string` of the path to the :class:`pandas.HDStore`
+
+        start: :class:`string` of the date to begin the price data
+
+    :RETURNS:
+
+        :class:`NoneType` but appends the store and comments the successes
+        ands failures
+    """
+    try:
+        store = pandas.HDFStore(path = loc, mode = 'r')
+    except IOError:
+        print  loc + " is not a valid path to an HDFStore Object"
+        return
+    store_keys = map(lambda x: x.split('/'), store.keys())
+    not_in_store = numpy.setdiff1d(ticker_list, store_keys )
+
+    new_prices = __tickers_to_dict(not_in_store, start = start)
+    map(lambda x: store.put(x, new_prices[x]), not_in_store)
+    store.close()
+    return None     
+    
+def save_data_to_store(ticker_list, loc, start = '01/01/1990'):
+    """
+    Initialization to pull down data, and store in ``HDF5`` file format.  This
+    function should be used "the first time" a ``store`` is created, later using
+    different update functionality.
 
     :ARGS:
 
@@ -29,15 +78,7 @@ def save_data_to_hdf5(ticker_list, loc, start = '01/01/1990'):
 
         saves a ``HDF5`` file format with tickers as key values
     """
-    reader = pandas.io.data.DataReader
-    d = {}
-    for ticker in ticker_list:
-        try:
-            d[ticker] = reader(ticker, 'yahoo', start = start)
-            print "worked for " + ticker
-        except:
-            print "failed for " + ticker
-
+    d = __tickers_to_dict(ticker_list)
     store = pandas.HDFStore(path = loc, mode = 'w')
     map(lambda x: store.put(x, d[x]), ticker_list)
     store.close()
@@ -45,14 +86,13 @@ def save_data_to_hdf5(ticker_list, loc, start = '01/01/1990'):
 
 def clean_existing_data(loc):
     hdf_store = pandas.HDFStore(path = loc, mode = 'r+')
-
     return None
-
-def append_existing_data(loc):
+    
+def update_store_prices(loc):
     """
-    Take an existing :class:`pandas.HDFStore` located at ``loc`` and loop
-    through the key values, intelligently updating the price data if a more
-    recent price exists from ``Yahoo!``
+    Take an existing store at path ``loc`` and loop through the key values,
+    intelligently updating the price data if a more recent price exists according to
+    prices from ``Yahoo!``
 
     :ARGS:
 
@@ -82,6 +122,8 @@ def append_existing_data(loc):
             try:
                 tmp = reader(key.strip('/'), 'yahoo', start = strftime(
                     last_stored_date, format = '%m/%d/%Y'))
+
+                #need to drop duplicates because there's 1 row of overlap
                 store.put(key, stored_data.append(tmp).drop_duplicates())
             except IOError:
                 print "could not update " + key
@@ -89,7 +131,31 @@ def append_existing_data(loc):
     store.close()
     return None
 
+def check_store_for_key(loc, key):
+    """
+    A quick check to determine whether the :class:`pandas.HDFStore` has data
+    for ``key``
 
+    :ARGS:
+
+        loc: :class:`string` of path to :class:`pandas.HDFStore`
+
+        key: :class:`string` of the ticker to check if currently available
+
+    :RETURNS:
+
+        whether ``key`` is currently a part of the data set
+    """
+    try:
+        store = pandas.HDFStore(path = loc, mode = 'r')
+    except IOError:
+        print  loc + " is not a valid path to an HDFStore Object"
+        return
+    
+    store_keys = store.keys()
+    store.close()
+    return key in map(lambda x: x.strip('/'), store_keys )
+    
 def prep_append_test_data():
     tickers = ['AGG', 'LQD', 'IYR', 'EEM', 'EFA', 'IWV']
     path = '../data/test.h5'
