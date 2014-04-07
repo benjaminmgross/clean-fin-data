@@ -53,7 +53,8 @@ To install `tables` on Mac OS X Mavericks, you need [`HDF5`](http://www.hdfgroup
 You probably need to execute the steps just covered.
 
 
-##To Do 
+##To Do
+- ~~Create the ability to check if a ticker is already a member of a store~~
 - Write the scrub functionality
 - ~~Write the append functionality~~
 - Consider writing to a log file that specifies all of the additions / changes / etc. that were accomplished in each function
