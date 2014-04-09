@@ -57,14 +57,14 @@ def __gen_master_index(ticker_dict, n_min):
                      ticker_dict.keys()), index = ticker_dict.keys() )
 
     end_dates = end_dates[dt_starts.index]
-
-    if (end_dates[:n_min][1:] != end_dates.shift(1)).all():
+    
+    if (end_dates[:n_min] == end_dates[0]).all() == False:
         print "Terminal Values are not the same and Master Index won't work"
         return
 
     else:
     #find the union of the first n_min indexes
-    mi = reduce(lambda x, y: x & y, map(lambda x: ticker_dict[x].dropna().index,
+        mi = reduce(lambda x, y: x & y, map(lambda x: ticker_dict[x].dropna().index,
                                           dt_starts[:n_min].index) )
     return mi
     
