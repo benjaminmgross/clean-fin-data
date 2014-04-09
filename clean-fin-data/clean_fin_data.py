@@ -10,8 +10,9 @@
 
 import argparse
 import datetime
-import pandas
 import numpy
+import pandas
+import os
 import pandas.io.data
 
 def __tickers_to_dict(ticker_list, start = '01/01/1990'):
@@ -27,6 +28,46 @@ def __tickers_to_dict(ticker_list, start = '01/01/1990'):
         except:
             print "failed for " + ticker
     return d
+
+def __gen_master_index(ticker_dict, n_min):
+    """
+    Because many tickers have missing data in one or two spots, this function
+    aggregates ``n_min`` indexes to determine a Master Index ("MI").
+
+    :ARGS:
+
+        ticker_dict: :class:`dictionary` with tickers for keys and price data for
+        values
+
+        n_min: :class:integer of the minimum number of indexes to use before "all
+        dates" have been determined
+
+    :RETURNS:
+
+        :class:`pandas.DatetimeIndex` of a Master Index
+    """
+    
+    #create a sorted Series of the tickers and the dates they begin
+    dt_starts = pandas.Series( map(lambda x: ticker_dict[x].dropna().index.min(),
+        ticker_dict.keys()), index = ticker_dict.keys() )
+    dt_starts.sort()
+
+    #check to make sure the tickers end on the same date (or MI doesn't work)
+    end_dates = pandas.Series( map( lambda x: ticker_dict[x].dropna().index.max(),
+                     ticker_dict.keys()), index = ticker_dict.keys() )
+
+    end_dates = end_dates[dt_starts.index]
+
+    if (end_dates[:n_min][1:] != end_dates.shift(1)).all():
+        print "Terminal Values are not the same and Master Index won't work"
+        return
+
+    else:
+    #find the union of the first n_min indexes
+    mi = reduce(lambda x, y: x & y, map(lambda x: ticker_dict[x].dropna().index,
+                                          dt_starts[:n_min].index) )
+    return mi
+    
 
 def append_store_prices(ticker_list, loc, start = '01/01/1990'):
     """
@@ -58,13 +99,14 @@ def append_store_prices(ticker_list, loc, start = '01/01/1990'):
     new_prices = __tickers_to_dict(not_in_store, start = start)
     map(lambda x: store.put(x, new_prices[x]), not_in_store)
     store.close()
-    return None     
+    return None  
     
-def save_data_to_store(ticker_list, loc, start = '01/01/1990'):
+def initialize_data_to_store(ticker_list, loc, start = '01/01/1990'):
     """
     Initialization to pull down data, and store in ``HDF5`` file format.  This
     function should be used "the first time" a ``store`` is created, later using
-    different update functionality.
+    different update functionality.  Function will exist if a file with that name
+    already exists.
 
     :ARGS:
 
@@ -77,11 +119,21 @@ def save_data_to_store(ticker_list, loc, start = '01/01/1990'):
     :RETURNS:
 
         saves a ``HDF5`` file format with tickers as key values
+
+    .. note:: Will Not Overwite Existing File
+
+        If a file already exists with that path, the function will not overwite
+        that file -- and therefore must be deleted manually outside of the program
+        in order for the function to run.
+
     """
-    d = __tickers_to_dict(ticker_list)
-    store = pandas.HDFStore(path = loc, mode = 'w')
-    map(lambda x: store.put(x, d[x]), ticker_list)
-    store.close()
+    if os.path.isfile(loc) == False:
+        d = __tickers_to_dict(ticker_list)
+        store = pandas.HDFStore(path = loc, mode = 'w')
+        map(lambda x: store.put(x, d[x]), ticker_list)
+        store.close()
+    else:
+        print "A file already exists in that location"
     return None
 
 def clean_existing_data(loc):
