@@ -15,20 +15,6 @@ import pandas
 import os
 import pandas.io.data
 
-def __tickers_to_dict(ticker_list, start = '01/01/1990'):
-    """
-    Utility function to return a dictionary of (ticker, price_df) mappings
-    """
-    reader = pandas.io.data.DataReader
-    d = {}
-    for ticker in ticker_list:
-        try:
-            d[ticker] = reader(ticker, 'yahoo', start = start)
-            print "worked for " + ticker
-        except:
-            print "failed for " + ticker
-    return d
-
 def __gen_master_index(ticker_dict, n_min):
     """
     Because many tickers have missing data in one or two spots, this function
@@ -63,10 +49,49 @@ def __gen_master_index(ticker_dict, n_min):
         return
 
     else:
-    #find the union of the first n_min indexes
+        #find the union of the first n_min indexes
         mi = reduce(lambda x, y: x & y, map(lambda x: ticker_dict[x].dropna().index,
                                           dt_starts[:n_min].index) )
     return mi
+
+def __find_and_clean_data_gaps(price_frame, master_index, ticker):
+    reader = pandas.io.data.DataReader
+    #if there are no price gaps, return the function
+    d_o = price_frame.dropna().index.min()
+    if price_frame.loc[d_o:].index.equals(master_index[master_index.get_loc(d_o):]):
+        print "No data gaps found for " + ticker
+        return
+
+    #otherwise, fill the gaps with Google data
+    else:
+        data = __tickers_to_dict(ticker)
+        #fille the gaps
+    return None
+
+def __tickers_to_dict(ticker_list, start = '01/01/1990'):
+    """
+    Utility function to return a dictionary of (ticker, price_df) mappings or a single
+    :class:`pandas.DataFrame` when the ``ticker_list`` is :class:`str`
+    """
+    __get_data(ticker, start = '01/01/1990'):
+        reader = pandas.io.data.DataReader
+        try:
+            data = reader(ticker, 'yahoo', start = start)
+            print "worked for " + ticker
+            return
+        except:
+            print "failed for " + ticker
+        return data
+
+    if isinstance(ticker_list, str):
+        return __get_data(ticker_list, start = start)
+    else:
+        d = {}
+        for ticker in ticker_list:
+            d[ticker] = __get_data(ticker, start = start)
+    return d
+
+
     
 
 def append_store_prices(ticker_list, loc, start = '01/01/1990'):
@@ -126,11 +151,17 @@ def initialize_data_to_store(ticker_list, loc, start = '01/01/1990'):
         that file -- and therefore must be deleted manually outside of the program
         in order for the function to run.
 
+    .. note:: Master Index
+
+        Each store that is created gets a key of "Master Index" that indicates
+        
     """
     if os.path.isfile(loc) == False:
         d = __tickers_to_dict(ticker_list)
+        master_index = __gen_master_index(d, n_min = 5)
         store = pandas.HDFStore(path = loc, mode = 'w')
-        map(lambda x: store.put(x, d[x]), ticker_list)
+        map(lambda x: store.put(x, d[x] ), ticker_list)
+        store.put("master_index", master_index)
         store.close()
     else:
         print "A file already exists in that location"
@@ -142,9 +173,8 @@ def clean_existing_data(loc):
     
 def update_store_prices(loc):
     """
-    Take an existing store at path ``loc`` and loop through the key values,
-    intelligently updating the price data if a more recent price exists according to
-    prices from ``Yahoo!``
+    Update to the most recent prices for all keys of an existing store, located at
+    path ``loc``.
 
     :ARGS:
 
@@ -183,7 +213,7 @@ def update_store_prices(loc):
     store.close()
     return None
 
-def check_store_for_key(loc, key):
+def is_key_in_store(loc, key):
     """
     A quick check to determine whether the :class:`pandas.HDFStore` has data
     for ``key``
@@ -222,17 +252,14 @@ def prep_append_test_data():
     store.close()
     return None
 
-def scipt_function(arg_1, arg_2):
-	return None
-
 if __name__ == '__main__':
-	
-	usage = sys.argv[0] + "usage instructions"
-	description = "describe the function"
-	parser = argparse.ArgumentParser(description = description, usage = usage)
-	parser.add_argument('name_1', nargs = 1, type = str, help = 'describe input 1')
-	parser.add_argument('name_2', nargs = '+', type = int, help = "describe input 2")
+    
+    usage = sys.argv[0] + "usage instructions"
+    description = "describe the function"
+    parser = argparse.ArgumentParser(description = description, usage = usage)
+    parser.add_argument('name_1', nargs = 1, type = str, help = 'describe input 1')
+    parser.add_argument('name_2', nargs = '+', type = int, help = "describe input 2")
 
-	args = parser.parse_args()
-	
-	script_function(input_1 = args.name_1[0], input_2 = args.name_2)
+    args = parser.parse_args()
+    
+    script_function(input_1 = args.name_1[0], input_2 = args.name_2)
