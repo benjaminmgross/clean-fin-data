@@ -14,6 +14,29 @@ import numpy
 import pandas
 import os
 import pandas.io.data
+import visualize_wealth.analyze as vwa
+
+def __find_jumps(price_df):
+    """
+    Determines the appropriate vol band to determine when dividends and splits have
+    occured, in the case of missing data
+    """
+    outliers = True
+    ratio = price_df.loc[:, 'Close'].div(price_df.loc[:, 'Adj Close']).apply(
+        numpy.log).diff()
+    vol_bands = numpy.linspace(.001, 2, 500)
+    d = {'num_outside':[], 'vol_band':[] }
+    for vol in vol_bands:
+        d['num outside'].append(
+            ratio[(ratio > ratio.mean() + vol*ratio.std() ) | (
+            ratio < ratio.mean() - vol*ratio.std() )].shape[0]
+        d['vol_band'].append(vol)
+
+    out_df = pandas.DataFrame(d)
+    cons_outs = vwa.consecutive(out_df['num_outside'] == out_df['num_outside'].shift(
+        1)).astype(int)
+    return out_df['vol band'][cons_outs.argmax()]
+    
 
 def __gen_master_index(ticker_dict, n_min):
     """
@@ -56,39 +79,51 @@ def __gen_master_index(ticker_dict, n_min):
 
 def __find_and_clean_data_gaps(price_frame, master_index, ticker):
     reader = pandas.io.data.DataReader
-    #if there are no price gaps, return the function
-    d_o = price_frame.dropna().index.min()
+    #the starting date is the greater of the master index start or etf start
+    d_o = max([price_frame.dropna().index.min(), master_index.min()])
+
+    #if there are no gaps, somply return and don't alter the data
     if price_frame.loc[d_o:].index.equals(master_index[master_index.get_loc(d_o):]):
         print "No data gaps found for " + ticker
         return
-
     #otherwise, fill the gaps with Google data
     else:
         data = __tickers_to_dict(ticker)
-        #fille the gaps
+        
+        #fill the gaps
+        
     return None
 
-def __tickers_to_dict(ticker_list, start = '01/01/1990'):
+def __tickers_to_dict(ticker_list, api = 'yahoo', start = '01/01/1990'):
     """
-    Utility function to return a dictionary of (ticker, price_df) mappings or a single
+    Utility function to return ticker data where the input is either a ticker,
+    or a list of tickers.
+
+    :ARGS:
+
+        ticker_list: :class:`list` in the case of multiple tickers or :class:`str`
+        in the case of one ticker
+        
+     dictionary of (ticker, price_df) mappings or a
+    single
+    
     :class:`pandas.DataFrame` when the ``ticker_list`` is :class:`str`
     """
-    __get_data(ticker, start = '01/01/1990'):
+    def __get_data(ticker, api, start):
         reader = pandas.io.data.DataReader
         try:
-            data = reader(ticker, 'yahoo', start = start)
+            data = reader(ticker, api, start = start)
             print "worked for " + ticker
-            return
+            return data
         except:
             print "failed for " + ticker
-        return data
-
+            return
     if isinstance(ticker_list, str):
-        return __get_data(ticker_list, start = start)
+        return __get_data(ticker_list, api = api, start = start)
     else:
         d = {}
         for ticker in ticker_list:
-            d[ticker] = __get_data(ticker, start = start)
+            d[ticker] = __get_data(ticker, api = api, start = start)
     return d
 
 
