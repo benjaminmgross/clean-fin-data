@@ -19,23 +19,34 @@ import visualize_wealth.analyze as vwa
 def __find_jumps(price_df):
     """
     Determines the appropriate vol band to determine when dividends and splits have
-    occured, in the case of missing data
+    occured, in the case of missing data... i.e. the ugliest algorithm you've ever
+    seen to find the level that defines dividends and splits
     """
-    outliers = True
+
     ratio = price_df.loc[:, 'Close'].div(price_df.loc[:, 'Adj Close']).apply(
         numpy.log).diff()
-    vol_bands = numpy.linspace(.001, 2, 500)
+    vol_bands = numpy.linspace(.001, 2, 1000)
     d = {'num_outside':[], 'vol_band':[] }
     for vol in vol_bands:
-        d['num outside'].append(
+        d['num_outside'].append(
             ratio[(ratio > ratio.mean() + vol*ratio.std() ) | (
-            ratio < ratio.mean() - vol*ratio.std() )].shape[0]
-        d['vol_band'].append(vol)
+            ratio < ratio.mean() - vol*ratio.std() )].shape[0])
+        d['vol_band'].append(vol)  
 
     out_df = pandas.DataFrame(d)
-    cons_outs = vwa.consecutive(out_df['num_outside'] == out_df['num_outside'].shift(
-        1)).astype(int)
-    return out_df['vol band'][cons_outs.argmax()]
+
+    #find out the frequency for each of the vol bands (the non-limit max is our
+    #bogey
+    band_cnt = out_df['num_outside'].value_counts()
+    band_cnt.sort(ascending = False)
+
+    #determine the band, in units of volatility, where the jumps have occurred
+    max_out = jumps.num_outside.max()
+    min_out = jumps.num_outside.min()
+    threshold = band_cnt[(band_cnt.index != max_out) & (band_cnt.index != min_out)].max()
+    thr_ind = band_cnt[band_cnt == threshold].index
+    agg = out_df.loc[out_df.num_outside == thr_ind[0],  :]
+    return agg['vol_vand'].mean()
     
 
 def __gen_master_index(ticker_dict, n_min):
