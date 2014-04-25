@@ -16,13 +16,22 @@ import os
 import pandas.io.data
 import visualize_wealth.analyze as vwa
 
-def __find_jumps(price_df):
+def __get_jump_stats(price_df)
     """
-    Determines the appropriate vol band to determine when dividends and splits have
-    occured, in the case of missing data... i.e. the ugliest algorithm you've ever
-    seen to find the level that defines dividends and splits
-    """
+    Helper function to determine the number of ratio changes that are outside a given
+    volatility band
 
+    :ARGS:
+
+        price_df: :class:`pandas.DataFrame` that has columns of (at least) 'Close'
+        and 'Adj Close'
+
+    :RETURNS:
+
+        :class:`pandas.DataFrame` with columns 'num_outside' and 'vol_band' showing
+        the number of ratio changes that were outside of a given volatility band
+    
+    """
     ratio = price_df.loc[:, 'Close'].div(price_df.loc[:, 'Adj Close']).apply(
         numpy.log).diff()
     vol_bands = numpy.linspace(.001, 2, 1000)
@@ -35,19 +44,51 @@ def __find_jumps(price_df):
 
     out_df = pandas.DataFrame(d)
 
+def __find_jump_height(price_df):
+    """
+    Determines the appropriate vol band to determine when dividends and splits have
+    occured, in the case of missing data... i.e. the ugliest algorithm you've ever
+    seen to find the threshold level that defines dividends and splits
+
+    :ARGS:
+
+        price_df: :class:`pandas.DataFrame` that has columns of (at least) 'Close'
+        and 'Adj Close'
+
+    :RETURNS:
+
+        :class:`float` of the minimum volatility threshold for which jumps have
+        occurred
+    
+    """
+    out_df = __get_jump_stats(price_df)
+    
     #find out the frequency for each of the vol bands (the non-limit max is our
     #bogey
     band_cnt = out_df['num_outside'].value_counts()
     band_cnt.sort(ascending = False)
 
     #determine the band, in units of volatility, where the jumps have occurred
-    max_out = jumps.num_outside.max()
-    min_out = jumps.num_outside.min()
-    threshold = band_cnt[(band_cnt.index != max_out) & (band_cnt.index != min_out)].max()
+    max_out, min_out = jumps.num_outside.max(), jumps.num_outside.min()
+    threshold = band_cnt[(band_cnt.index != max_out) & (
+        band_cnt.index != min_out)].max()
     thr_ind = band_cnt[band_cnt == threshold].index
     agg = out_df.loc[out_df.num_outside == thr_ind[0],  :]
-    return agg['vol_vand'].mean()
+    return agg['vol_vand'].min()
+
+def __find_jump_interval(price_df):
+    """
+    Returns the median interval (in days) between jumps
     
+    """
+    thresh = ____get_jump_stats(price_df)
+    jumps = ratio[(ratio > ratio.mean() + ratio.std()*thresh) | (
+        ratio < ratio.mean() - ratio.std()*thresh) ]
+
+    #find the distances between the jumps
+    deltas = map(x, y: x - y, jumps.index[1:], jumps.index[:-1] )
+    day_deltas = map(lambda x: x.days, deltas)
+    return numpy.median(day_deltas)
 
 def __gen_master_index(ticker_dict, n_min):
     """
