@@ -14,9 +14,8 @@ import numpy
 import pandas
 import os
 import pandas.io.data
-import visualize_wealth.analyze as vwa
 
-def __get_jump_stats(price_df)
+def __get_jump_stats(price_df):
     """
     Helper function to determine the number of ratio changes that are outside a given
     volatility band
@@ -81,12 +80,12 @@ def __find_jump_interval(price_df):
     Returns the median interval (in days) between jumps
     
     """
-    thresh = ____get_jump_stats(price_df)
+    thresh = __get_jump_stats(price_df)
     jumps = ratio[(ratio > ratio.mean() + ratio.std()*thresh) | (
         ratio < ratio.mean() - ratio.std()*thresh) ]
 
     #find the distances between the jumps
-    deltas = map(x, y: x - y, jumps.index[1:], jumps.index[:-1] )
+    deltas = map(lambda x, y: x - y, jumps.index[1:], jumps.index[:-1] )
     day_deltas = map(lambda x: x.days, deltas)
     return numpy.median(day_deltas)
 
@@ -179,8 +178,26 @@ def __tickers_to_dict(ticker_list, api = 'yahoo', start = '01/01/1990'):
     return d
 
 
-    
+def __first_valid_date(prices):
+    """
+    Helper function to determine the first valid date from a set of different prices
+    Can take either a :class:`dict` of :class:`pandas.DataFrame`s where each key is a
+    ticker's 'Open', 'High', 'Low', 'Close', 'Adj Close' or a single
+    :class:`pandas.DataFrame` where each column is a different ticker
+    """
+    #import pdb
+    #pdb.set_trace()
+    iter_dict = { pandas.DataFrame: lambda x: x.columns,
+                  dict: lambda x: x.keys() } 
 
+    try:
+        each_first = map(lambda x: prices[x].dropna().index.min(),
+                         iter_dict[ type(prices) ](prices) )
+        return max(each_first)
+    except KeyError:
+        print "prices must be a DataFrame or dictionary"
+        return
+    
 def append_store_prices(ticker_list, loc, start = '01/01/1990'):
     """
     Given an existing store located at ``loc``, check to make sure the
