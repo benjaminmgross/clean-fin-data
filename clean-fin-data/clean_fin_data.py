@@ -14,8 +14,25 @@ import numpy
 import pandas
 import os
 import pandas.io.data
+import matplotlib.pyplot as plt
 
+def test_jump_detection(ticker):
+    price_df = __tickers_to_dict(ticker)
+    jump_height = __find_jump_height(price_df)
+    
+    try:
+        ln_chg = price_df['Close'].div(price_df['Adj Close']).apply(numpy.log).diff()
+        threshold = ln_chg.mean() - ln_chg.std()*jump_height
+        fig = plt.plot()
+        ln_chg.plot()
+        plt.axhline(y = threshold, color = 'r', ls = '--')
+        plt.title(ticker, fontsize = 16)
+        plt.show()
+    except TypeError:
+        print "There are no Dividends or Splits to Illustrate"
 
+    return None
+    
 def __get_jump_stats(price_df):
     """
     Helper function to determine the number of ratio changes that are outside a given
@@ -61,22 +78,25 @@ def __find_jump_height(price_df):
         occurred
     
     """
-    import pdb
-    pdb.set_trace()
-    out_df = __get_jump_stats(price_df)
+    if price_df['Close'].equals(price_df['Adj Close']):
+        print "No Dividends or Splits, Adj Close and Close are all Equal"
+        return None
+    else:
+        
+        out_df = __get_jump_stats(price_df)
     
-    #find out the frequency for each of the vol bands (the non-limit max is our
-    #bogey
-    band_cnt = out_df['num_outside'].value_counts()
-    band_cnt.sort(ascending = False)
-
-    #determine the band, in units of volatility, where the jumps have occurred
-    max_out, min_out = out_df['num_outside'].max(), out_df['num_outside'].min()
-    threshold = band_cnt[(band_cnt.index != max_out) & (
-        band_cnt.index != min_out)].max()
-    thr_ind = band_cnt[band_cnt == threshold].index
-    agg = out_df.loc[out_df.num_outside == thr_ind[0],  :]
-    return agg['vol_band'].min()
+        #find out the frequency for each of the vol bands (the non-limit max is our
+        #bogey
+        band_cnt = out_df['num_outside'].value_counts()
+        band_cnt.sort(ascending = False)
+    
+        #determine the band, in units of volatility, where the jumps have occurred
+        max_out, min_out = out_df['num_outside'].max(), out_df['num_outside'].min()
+        threshold = band_cnt[(band_cnt.index != max_out) & (
+            band_cnt.index != min_out)].max()
+        thr_ind = band_cnt[band_cnt == threshold].index
+        agg = out_df.loc[out_df.num_outside == thr_ind[0],  :]
+        return agg['vol_band'].min()
 
 def __find_jump_interval(price_df):
     """
@@ -365,7 +385,8 @@ if __name__ == '__main__':
     description = "describe the function"
     parser = argparse.ArgumentParser(description = description, usage = usage)
     parser.add_argument('name_1', nargs = 1, type = str, help = 'describe input 1')
-    parser.add_argument('name_2', nargs = '+', type = int, help = "describe input 2")
+    parser.add_argument('name_2', nargs = '+', type = int,
+                        help = "describe input 2")
 
     args = parser.parse_args()
     
