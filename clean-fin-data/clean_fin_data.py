@@ -15,6 +15,7 @@ import pandas
 import os
 import pandas.io.data
 
+
 def __get_jump_stats(price_df):
     """
     Helper function to determine the number of ratio changes that are outside a given
@@ -41,7 +42,7 @@ def __get_jump_stats(price_df):
             ratio < ratio.mean() - vol*ratio.std() )].shape[0])
         d['vol_band'].append(vol)  
 
-    out_df = pandas.DataFrame(d)
+    return pandas.DataFrame(d)
 
 def __find_jump_height(price_df):
     """
@@ -60,6 +61,8 @@ def __find_jump_height(price_df):
         occurred
     
     """
+    import pdb
+    pdb.set_trace()
     out_df = __get_jump_stats(price_df)
     
     #find out the frequency for each of the vol bands (the non-limit max is our
@@ -68,12 +71,12 @@ def __find_jump_height(price_df):
     band_cnt.sort(ascending = False)
 
     #determine the band, in units of volatility, where the jumps have occurred
-    max_out, min_out = jumps.num_outside.max(), jumps.num_outside.min()
+    max_out, min_out = out_df['num_outside'].max(), out_df['num_outside'].min()
     threshold = band_cnt[(band_cnt.index != max_out) & (
         band_cnt.index != min_out)].max()
     thr_ind = band_cnt[band_cnt == threshold].index
     agg = out_df.loc[out_df.num_outside == thr_ind[0],  :]
-    return agg['vol_vand'].min()
+    return agg['vol_band'].min()
 
 def __find_jump_interval(price_df):
     """
@@ -129,8 +132,7 @@ def __gen_master_index(ticker_dict, n_min):
     return mi
 
 def __find_and_clean_data_gaps(price_frame, master_index, ticker):
-    reader = pandas.io.data.DataReader
-    #the starting date is the greater of the master index start or etf start
+    #the starting date is the greater of the master index start or stock start
     d_o = max([price_frame.dropna().index.min(), master_index.min()])
 
     #if there are no gaps, somply return and don't alter the data
@@ -139,7 +141,8 @@ def __find_and_clean_data_gaps(price_frame, master_index, ticker):
         return
     #otherwise, fill the gaps with Google data
     else:
-        data = __tickers_to_dict(ticker)
+        plug_data = __tickers_to_dict(ticker, api = 'google', start = d_o)
+        
         
         #fill the gaps
         
