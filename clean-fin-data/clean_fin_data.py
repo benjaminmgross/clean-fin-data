@@ -16,22 +16,55 @@ import os
 import pandas.io.data
 import matplotlib.pyplot as plt
 
-def test_jump_detection(ticker):
-    price_df = __tickers_to_dict(ticker)
-    jump_height = __find_jump_height(price_df)
-    
-    try:
-        ln_chg = price_df['Close'].div(price_df['Adj Close']).apply(numpy.log).diff()
-        threshold = ln_chg.mean() - ln_chg.std()*jump_height
-        fig = plt.plot()
-        ln_chg.plot()
-        plt.axhline(y = threshold, color = 'r', ls = '--')
-        plt.title(ticker, fontsize = 16)
-        plt.show()
-    except TypeError:
-        print "There are no Dividends or Splits to Illustrate"
+def test_jump_detection(ticker_list):
+    """
+    The only real way to determine the efficacy is to actually look at ln_chg
+    graphs of several different tickers.  So this function loops through a given
+    list of tickers while asking the user for input whether or not the algorithm
+    "appeared to work," and then writes the results into a ``.csv`` file.
 
-    return None
+    :ARGS:
+
+        tick_list: :class:`list` or iterable of tickers to test the dividend and
+        split identification algorithm
+
+    :RETURNS:
+
+        
+    """
+    d = {}
+    for ticker in ticker_list:
+        incomplete = True
+        price_df = __tickers_to_dict(ticker)
+        jump_height = __find_jump_height(price_df)
+        lims = (-.01, .01)
+
+        while incomplete:
+            try:
+                ln_chg = price_df['Close'].div(
+                    price_df['Adj Close']).apply(numpy.log).diff()
+                threshold = ln_chg.mean() - ln_chg.std()*jump_height
+                fig = plt.plot()
+                ln_chg.plot()
+                plt.axhline(y = threshold, color = 'r', ls = '--')
+                plt.title(ticker, fontsize = 16)
+                plt.ylim(lims)
+                plt.show()
+                resp = raw_input("Do the limits need to be changed? y/n ")
+                
+                if resp == 'y':
+                    lims = raw_input("What are the new limits? ymin, ymax ")
+                    lims = map(lambda x: float(x), lims.split(',') )
+                else:
+                    didwork = raw_input("Did the algorithm work? y/n " )
+                    d[ticker] = didwork
+                    incomplete = False
+            
+            except TypeError:
+                print "There are no Dividends or Splits to Illustrate"
+                d[ticker] = "No Div or Splits"
+                incomplete = False
+    return pandas.DataFrame(d)
     
 def __get_jump_stats(price_df):
     """
@@ -55,9 +88,8 @@ def __get_jump_stats(price_df):
     d = {'num_outside':[], 'vol_band':[] }
     for vol in vol_bands:
         d['num_outside'].append(
-            ratio[(ratio > ratio.mean() + vol*ratio.std() ) | (
-            ratio < ratio.mean() - vol*ratio.std() )].shape[0])
-        d['vol_band'].append(vol)  
+            len(ratio[(ratio.abs() > ratio.mean() + vol*ratio.std() )]) )
+        d['vol_band'].append(vol)
 
     return pandas.DataFrame(d)
 
@@ -80,13 +112,10 @@ def __find_jump_height(price_df):
     """
     if price_df['Close'].equals(price_df['Adj Close']):
         print "No Dividends or Splits, Adj Close and Close are all Equal"
-        return None
+        return 0.0
     else:
-        
         out_df = __get_jump_stats(price_df)
-    
-        #find out the frequency for each of the vol bands (the non-limit max is our
-        #bogey
+        #the max frequency for each of the vol bands is our bogey
         band_cnt = out_df['num_outside'].value_counts()
         band_cnt.sort(ascending = False)
     
@@ -101,7 +130,6 @@ def __find_jump_height(price_df):
 def __find_jump_interval(price_df):
     """
     Returns the median interval (in days) between jumps
-    
     """
     thresh = __get_jump_stats(price_df)
     jumps = ratio[(ratio > ratio.mean() + ratio.std()*thresh) | (
@@ -178,10 +206,10 @@ def __tickers_to_dict(ticker_list, api = 'yahoo', start = '01/01/1990'):
         ticker_list: :class:`list` in the case of multiple tickers or :class:`str`
         in the case of one ticker
         
-     dictionary of (ticker, price_df) mappings or a
-    single
-    
-    :class:`pandas.DataFrame` when the ``ticker_list`` is :class:`str`
+    :RETURNS:
+
+        dictionary of (ticker, price_df) mappings or a :class:`pandas.DataFrame`
+        when the ``ticker_list`` is :class:`str`
     """
     def __get_data(ticker, api, start):
         reader = pandas.io.data.DataReader
@@ -192,7 +220,7 @@ def __tickers_to_dict(ticker_list, api = 'yahoo', start = '01/01/1990'):
         except:
             print "failed for " + ticker
             return
-    if isinstance(ticker_list, str):
+    if isinstance(ticker_list, (str, unicode)):
         return __get_data(ticker_list, api = api, start = start)
     else:
         d = {}
