@@ -96,12 +96,10 @@ def __fwne_num_deriv(price_df, threshold = .001):
     abs_sorted = ln_chg.abs()
     abs_sorted.sort(ascending = True)
     #x_std = pandas.expanding_std(abs_sorted)
-    f_prime = lambda i: (ln_chg[i + 1] - ln_chg[i - 1])/2
-    slope = abs_sorted.apply(lambda x: f_prime(x), numpy.arange(1, len(ln_chg) - 1) )
-    slope
-    #the first jump over the threshold is our bogey, but need to transform back to
-    #the original ln_chg
-    return None
+    f_prime = lambda i: (abs_sorted[i + 1] - abs_sorted[i - 1])/2
+    slope = map(lambda x: f_prime(x), numpy.arange(1, len(ln_chg) - 1) )
+    slope = pandas.Series(slope, index = abs_sorted[1:-1].index)
+    return ln_chg[slope[slope > threshold].argmin() ]
     
 def __get_jump_stats(price_df):
     """
