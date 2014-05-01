@@ -75,7 +75,7 @@ def __find_wn_end(price_df, threshold = .0001):
     Another way to approach the dividend / split recognition problem (instead of
     incrementing the volatility band) is to sort ``ln_chg`` of the
     :math:`\\frac{\\textrm{Close}}{\\textrm{Adj Close}}` and look for the first
-    jump that occurs. That is the end of othe white noise and beginning of the data
+    jump that occurs. That is the end of the white noise and beginning of the data
     we're looking for
 
     :ARGS:
@@ -92,7 +92,7 @@ def __find_wn_end(price_df, threshold = .0001):
     #x_std = pandas.expanding_std(abs_sorted)
     jump_size = abs_sorted.diff()
     #the first jump over the threshold is our bogey, but need to transform back to
-    #the original ln_chg
+    #the original ln_chg value
     try:
         return ln_chg[jump_size[jump_size > threshold].argmin()]
     except ValueError:
@@ -128,13 +128,10 @@ def __get_jump_stats(price_df):
     ratio = price_df.loc[:, 'Close'].div(price_df.loc[:, 'Adj Close']).apply(
         numpy.log).diff()
     vol_bands = numpy.linspace(.001, 2, 1000)
-    d = {'num_outside':[], 'vol_band':[] }
-    for vol in vol_bands:
-        d['num_outside'].append(
-            len(ratio[(ratio.abs() > ratio.mean() + vol*ratio.std() )]) )
-        d['vol_band'].append(vol)
+    bands = map(lambda x: len(ratio[(
+        ratio.abs() > ratio.mean() + x*ratio.std() )]), vol_bands)
 
-    return pandas.DataFrame(d)
+    return pandas.DataFrame({'num_outside': bands, 'vol_band':vol_bands})
 
 def __find_jump_height(price_df):
     """
@@ -169,7 +166,7 @@ def __find_jump_height(price_df):
         thr_ind = band_cnt[band_cnt == threshold].index
         agg = out_df.loc[out_df.num_outside == thr_ind[0],  :]
         return agg['vol_band'].max()
-        #return agg['vol_band'].min()
+        ##return agg['vol_band'].min()
 
 def __find_jump_interval(price_df):
     """
