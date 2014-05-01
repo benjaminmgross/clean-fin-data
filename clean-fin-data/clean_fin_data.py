@@ -37,6 +37,7 @@ def test_jump_detection(ticker_list):
         incomplete = True
         price_df = __tickers_to_dict(ticker)
         jump_height = __find_jump_height(price_df)
+        wn_height = __find_wn_end(price_df)
         lims = (-.01, .01)
 
         while incomplete:
@@ -46,7 +47,10 @@ def test_jump_detection(ticker_list):
                 threshold = ln_chg.mean() - ln_chg.std()*jump_height
                 fig = plt.plot()
                 ln_chg.plot()
-                plt.axhline(y = threshold, color = 'r', ls = '--')
+                plt.axhline(y = threshold, color = 'r', ls = '--',
+                            label = "vol band method")
+                plt.axhline(y = wn_height, color = 'c', ls = '--',
+                            label = "white noise method")
                 plt.title(ticker, fontsize = 16)
                 plt.ylim(lims)
                 plt.show()
@@ -66,7 +70,7 @@ def test_jump_detection(ticker_list):
                 incomplete = False
     return pandas.DataFrame(d)
 
-def __find_wn_end(price_df, threshold = .001):
+def __find_wn_end(price_df, threshold = .0001):
     """
     Another way to approach the dividend / split recognition problem (instead of
     incrementing the volatility band) is to sort ``ln_chg`` of the
@@ -89,7 +93,11 @@ def __find_wn_end(price_df, threshold = .001):
     jump_size = abs_sorted.diff()
     #the first jump over the threshold is our bogey, but need to transform back to
     #the original ln_chg
-    return ln_chg[jump_size[jump_size > threshold].argmin()]
+    try:
+        return ln_chg[jump_size[jump_size > threshold].argmin()]
+    except ValueError:
+        print "No values within that threshold"
+        return 0.0
 
 def __fwne_num_deriv(price_df, threshold = .001):
     ln_chg = price_df['Close'].div(price_df['Adj Close']).apply(numpy.log).diff()
@@ -160,7 +168,8 @@ def __find_jump_height(price_df):
             band_cnt.index != min_out)].max()
         thr_ind = band_cnt[band_cnt == threshold].index
         agg = out_df.loc[out_df.num_outside == thr_ind[0],  :]
-        return agg['vol_band'].min()
+        return agg['vol_band'].max()
+        #return agg['vol_band'].min()
 
 def __find_jump_interval(price_df):
     """
