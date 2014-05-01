@@ -65,6 +65,43 @@ def test_jump_detection(ticker_list):
                 d[ticker] = "No Div or Splits"
                 incomplete = False
     return pandas.DataFrame(d)
+
+def __find_wn_end(price_df, threshold = .001):
+    """
+    Another way to approach the dividend / split recognition problem (instead of
+    incrementing the volatility band) is to sort ``ln_chg`` of the
+    :math:`\\frac{\\textrm{Close}}{\\textrm{Adj Close}}` and look for the first
+    jump that occurs. That is the end of othe white noise and beginning of the data
+    we're looking for
+
+    :ARGS:
+
+        price_df: :class:`pandas.DataFrame` with 'Close' and 'Adj Close'
+
+    :RETURNS:
+
+        the distance for which dividends or / and splits begin to occur
+    """
+    ln_chg = price_df['Close'].div(price_df['Adj Close']).apply(numpy.log).diff()
+    abs_sorted = ln_chg.abs()
+    abs_sorted.sort(ascending = True)
+    #x_std = pandas.expanding_std(abs_sorted)
+    jump_size = abs_sorted.diff()
+    #the first jump over the threshold is our bogey, but need to transform back to
+    #the original ln_chg
+    return ln_chg[jump_size[jump_size > threshold].argmin()]
+
+def __fwne_num_deriv(price_df, threshold = .001):
+    ln_chg = price_df['Close'].div(price_df['Adj Close']).apply(numpy.log).diff()
+    abs_sorted = ln_chg.abs()
+    abs_sorted.sort(ascending = True)
+    #x_std = pandas.expanding_std(abs_sorted)
+    f_prime = lambda i: (ln_chg[i + 1] - ln_chg[i - 1])/2
+    slope = abs_sorted.apply(lambda x: f_prime(x), numpy.arange(1, len(ln_chg) - 1) )
+    slope
+    #the first jump over the threshold is our bogey, but need to transform back to
+    #the original ln_chg
+    return None
     
 def __get_jump_stats(price_df):
     """
