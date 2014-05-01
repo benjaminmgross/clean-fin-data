@@ -130,7 +130,6 @@ def __get_jump_stats(price_df):
     vol_bands = numpy.linspace(.001, 2, 1000)
     bands = map(lambda x: len(ratio[(
         ratio.abs() > ratio.mean() + x*ratio.std() )]), vol_bands)
-
     return pandas.DataFrame({'num_outside': bands, 'vol_band':vol_bands})
 
 def __find_jump_height(price_df):
@@ -181,6 +180,20 @@ def __find_jump_interval(price_df):
     day_deltas = map(lambda x: x.days, deltas)
     return numpy.median(day_deltas)
 
+def __get_divs_and_splits(price_df):
+
+    ln_chg = price_df['Close'].div(price_df['Adj Close']).apply(numpy.log).diff()
+    
+    vol_thresh = ln_chg.mean() - ln_chg.std()*__find_jump_height(price_df)
+    wn_thresh =  __find_wn_end(price_df)
+
+    if all(map(lambda x: x < 0., [wn_thresh, vol_thresh]) ):
+        thresh = max(wn_thresh, vol_thresh)
+    else:
+        thresh = min(wn_thresh, vol_thresh)
+
+    return ln_chg[ln_chg < thresh]
+    
 def __gen_master_index(ticker_dict, n_min):
     """
     Because many tickers have missing data in one or two spots, this function
