@@ -82,6 +82,54 @@ The next step is to perform a log transformation can be performed and then a cla
 
 With that information, and with a known Close Date, we can get really close to the actual Adjusted Close, and, if dividends or splits have occurred, make the necessary adjustments to the... well, Adjusted Close.
 
+##Tickers to train Logistic Algorithm
+
+| Ticker | Did Either Algo Work? |Were Any Non-WN Points Captured? |
+|:-------|:----------------------|:--------------------------------|
+| EWD    | No | No |
+| EWN    | No | Yes|
+| EWI    | Yes| Yes|
+| XLB    | Yes | Missed 1 |
+| QQQ    | No | Missed All |
+| IJR    | No | Yes, Missed Most |
+| IWM    | No | Yes, Missed Most |
+| IYZ   | Yes| Missed 1 |
+| IYE | No | Missed Several |
+| IYR | No | Missed Most |
+| IWN | No | Missed Most |
+| IJS | Yes| Missed a Couple |
+| IJT | No | Missed Most |
+| IJJ | No | Missed Most |
+| IJK | No | Missed Most |
+| EZU | No | Missed Most |
+| ICF | Yes| Missed 1 |
+| RWR | No | Missed Several |
+| VTI | No | Missed Several |
+| IWS | No | Missed All |
+| IWP | No | Missed Most |
+| IGE | No | Missed Most |
+| EPP | No | Missed All |
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+EWI, EWG, EWC: Blue algo was positive
+
+	
+
 
 ##To Do
 - ~~Create the ability to check if a ticker is already a member of a store~~

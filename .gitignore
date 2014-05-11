@@ -1,4 +1,4 @@
 *.pyc
-data/
+data/store.h5
 scratch/
 .DS_Store

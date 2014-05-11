@@ -14,14 +14,51 @@ import numpy
 import pandas
 import os
 import pandas.io.data
+import statsmodels.api as sm
 import matplotlib.pyplot as plt
+
+def train_logistic_parameters():
+    """
+    In 'data/traning_data/' specific ETFs were visually inspected and white noise (0)
+    and not white noise (1) were assigned. This data is loaded here to train the
+    logistic parameters, but you can use this functionality as a template to train
+    your own
+
+    :ARGS:
+
+        :class:`NoneType`
+
+    :RETURNS:
+
+        a fitted :class:`statsmodels.Logit` Logistic regression that has been fit to
+        the trained data
+    """
+    f = pandas.ExcelFile('../data/training_data/Trained Data.xlsx')
+    data = reduce(lambda a, b: numpy.vstack([ a, b]), 
+        map(lambda x: f.parse(x, index_col = 0)[['Ln Change', 'Y']], f.sheet_names))
+    data = pandas.DataFrame(training_data, columns = ['ln_chg', 'Y'])
+
+    #add an intercept for the model (required by statsmodels.api.Logit
+    data['intercept'] = 1.0
+
+    #fit the model
+    logit_model = sm.Logit(endog = data['Y'], exog = data[['ln_chg', 'intercept']])
+    return logit_model.fit()
+
+    
+    
+    
+    
 
 def test_jump_detection(ticker_list):
     """
-    The only real way to determine the efficacy is to actually look at ln_chg
-    graphs of several different tickers.  So this function loops through a given
-    list of tickers while asking the user for input whether or not the algorithm
-    "appeared to work," and then writes the results into a ``.csv`` file.
+    To determine the efficacy of the algorithms by looking at ``ln_chg``
+    graphs of several different tickers and see where each threshold is drawn for
+    the two different algorithms.
+
+    This function iterates over a givenlist of tickers, ``ticker_list`` while asking
+    the user for input whether or not the algorithm "appeared to work," and returns
+    the yes / no results for each ticker into a :class:`pandas.DataFrame`.
 
     :ARGS:
 
@@ -30,14 +67,17 @@ def test_jump_detection(ticker_list):
 
     :RETURNS:
 
+        :class:`pandas.DataFrame` of tickers and whether or not the algorithm
+        worked for each ticker based on the user responses.
+
         
     """
     d = {}
     for ticker in ticker_list:
         incomplete = True
-        price_df = __tickers_to_dict(ticker)
-        jump_height = __find_jump_height(price_df)
-        wn_height = __find_wn_end(price_df)
+        price_df = tickers_to_dict(ticker)
+        jump_height = find_jump_height(price_df)
+        wn_height = find_wn_end(price_df)
         lims = (-.01, .01)
 
         while incomplete:
@@ -70,7 +110,7 @@ def test_jump_detection(ticker_list):
                 incomplete = False
     return pandas.DataFrame(d)
 
-def __find_wn_end(price_df, threshold = .0001):
+def find_wn_end(price_df, threshold = .0001):
     """
     Another way to approach the dividend / split recognition problem (instead of
     incrementing the volatility band) is to sort ``ln_chg`` of the
@@ -99,7 +139,7 @@ def __find_wn_end(price_df, threshold = .0001):
         print "No values within that threshold"
         return 0.0
 
-def __fwne_num_deriv(price_df, threshold = .001):
+def fwne_num_deriv(price_df, threshold = .001):
     ln_chg = price_df['Close'].div(price_df['Adj Close']).apply(numpy.log).diff()
     abs_sorted = ln_chg.abs()
     abs_sorted.sort(ascending = True)
@@ -109,7 +149,7 @@ def __fwne_num_deriv(price_df, threshold = .001):
     slope = pandas.Series(slope, index = abs_sorted[1:-1].index)
     return ln_chg[slope[slope > threshold].argmin() ]
     
-def __get_jump_stats(price_df):
+def get_jump_stats(price_df):
     """
     Helper function to determine the number of ratio changes that are outside a given
     volatility band
@@ -132,7 +172,7 @@ def __get_jump_stats(price_df):
         ratio.abs() > ratio.mean() + x*ratio.std() )]), vol_bands)
     return pandas.DataFrame({'num_outside': bands, 'vol_band':vol_bands})
 
-def __find_jump_height(price_df):
+def find_jump_height(price_df):
     """
     Determines the appropriate vol band to determine when dividends and splits have
     occured, in the case of missing data... i.e. the ugliest algorithm you've ever
@@ -153,7 +193,7 @@ def __find_jump_height(price_df):
         print "No Dividends or Splits, Adj Close and Close are all Equal"
         return 0.0
     else:
-        out_df = __get_jump_stats(price_df)
+        out_df = get_jump_stats(price_df)
         #the max frequency for each of the vol bands is our bogey
         band_cnt = out_df['num_outside'].value_counts()
         band_cnt.sort(ascending = False)
@@ -167,11 +207,11 @@ def __find_jump_height(price_df):
         return agg['vol_band'].max()
         ##return agg['vol_band'].min()
 
-def __find_jump_interval(price_df):
+def find_jump_interval(price_df):
     """
     Returns the median interval (in days) between jumps
     """
-    thresh = __get_jump_stats(price_df)
+    thresh = get_jump_stats(price_df)
     jumps = ratio[(ratio > ratio.mean() + ratio.std()*thresh) | (
         ratio < ratio.mean() - ratio.std()*thresh) ]
 
@@ -180,13 +220,16 @@ def __find_jump_interval(price_df):
     day_deltas = map(lambda x: x.days, deltas)
     return numpy.median(day_deltas)
 
-def __get_divs_and_splits(price_df):
+def get_divs_and_splits(price_df):
 
     ln_chg = price_df['Close'].div(price_df['Adj Close']).apply(numpy.log).diff()
     
-    vol_thresh = ln_chg.mean() - ln_chg.std()*__find_jump_height(price_df)
-    wn_thresh =  __find_wn_end(price_df)
+    vol_thresh = ln_chg.mean() - ln_chg.std()*find_jump_height(price_df)
+    wn_thresh =  find_wn_end(price_df)
 
+    #some of the values showed up as positive (as in 1) during my testing, so this
+    #makes sure it's either "the correct threshold" or one of the minimums
+    
     if all(map(lambda x: x < 0., [wn_thresh, vol_thresh]) ):
         thresh = max(wn_thresh, vol_thresh)
     else:
@@ -194,7 +237,7 @@ def __get_divs_and_splits(price_df):
 
     return ln_chg[ln_chg < thresh]
     
-def __gen_master_index(ticker_dict, n_min):
+def gen_master_index(ticker_dict, n_min):
     """
     Because many tickers have missing data in one or two spots, this function
     aggregates ``n_min`` indexes to determine a Master Index ("MI").
@@ -233,7 +276,7 @@ def __gen_master_index(ticker_dict, n_min):
                                           dt_starts[:n_min].index) )
     return mi
 
-def __find_and_clean_data_gaps(price_frame, master_index, ticker):
+def find_and_clean_data_gaps(price_frame, master_index, ticker):
     #the starting date is the greater of the master index start or stock start
     d_o = max([price_frame.dropna().index.min(), master_index.min()])
 
@@ -243,14 +286,14 @@ def __find_and_clean_data_gaps(price_frame, master_index, ticker):
         return
     #otherwise, fill the gaps with Google data
     else:
-        plug_data = __tickers_to_dict(ticker, api = 'google', start = d_o)
+        plug_data = tickers_to_dict(ticker, api = 'google', start = d_o)
         
         
         #fill the gaps
         
     return None
 
-def __tickers_to_dict(ticker_list, api = 'yahoo', start = '01/01/1990'):
+def tickers_to_dict(ticker_list, api = 'yahoo', start = '01/01/1990'):
     """
     Utility function to return ticker data where the input is either a ticker,
     or a list of tickers.
@@ -283,7 +326,7 @@ def __tickers_to_dict(ticker_list, api = 'yahoo', start = '01/01/1990'):
     return d
 
 
-def __first_valid_date(prices):
+def first_valid_date(prices):
     """
     Helper function to determine the first valid date from a set of different prices
     Can take either a :class:`dict` of :class:`pandas.DataFrame`s where each key is a
@@ -330,7 +373,7 @@ def append_store_prices(ticker_list, loc, start = '01/01/1990'):
     store_keys = map(lambda x: x.split('/'), store.keys())
     not_in_store = numpy.setdiff1d(ticker_list, store_keys )
 
-    new_prices = __tickers_to_dict(not_in_store, start = start)
+    new_prices = tickers_to_dict(not_in_store, start = start)
     map(lambda x: store.put(x, new_prices[x]), not_in_store)
     store.close()
     return None  
@@ -366,8 +409,8 @@ def initialize_data_to_store(ticker_list, loc, start = '01/01/1990'):
         
     """
     if os.path.isfile(loc) == False:
-        d = __tickers_to_dict(ticker_list)
-        master_index = __gen_master_index(d, n_min = 5)
+        d = tickers_to_dict(ticker_list)
+        master_index = gen_master_index(d, n_min = 5)
         store = pandas.HDFStore(path = loc, mode = 'w')
         map(lambda x: store.put(x, d[x] ), ticker_list)
         store.put("master_index", master_index)
