@@ -17,7 +17,7 @@ import pandas.io.data
 import statsmodels.api as sm
 import matplotlib.pyplot as plt
 
-def train_logistic_parameters():
+def trained_logistic_model():
     """
     In 'data/traning_data/' specific ETFs were visually inspected and white noise (0)
     and not white noise (1) were assigned. This data is loaded here to train the
@@ -35,8 +35,8 @@ def train_logistic_parameters():
     """
     f = pandas.ExcelFile('../data/training_data/Trained Data.xlsx')
     data = reduce(lambda a, b: numpy.vstack([ a, b]), 
-        map(lambda x: f.parse(x, index_col = 0)[['Ln Change', 'Y']], f.sheet_names))
-    data = pandas.DataFrame(training_data, columns = ['ln_chg', 'Y'])
+        map(lambda x: f.parse(x, index_col = 0)[['ln_chg', 'Y']], f.sheet_names))
+    data = pandas.DataFrame(data, columns = ['ln_chg', 'Y'])
 
     #add an intercept for the model (required by statsmodels.api.Logit
     data['intercept'] = 1.0
@@ -45,9 +45,22 @@ def train_logistic_parameters():
     logit_model = sm.Logit(endog = data['Y'], exog = data[['ln_chg', 'intercept']])
     return logit_model.fit()
 
+def load_logit_model(path = '../data/training_data/logit_model')
+    """
+    Use the :module:`pickle` module to load the saved logit file
+    """
+    return pickle.load(open(path, 'r') )
+
+def save_logit_model(logit_model, path):
+    """
+    Use the :module"`pickle` module to save the logit regression model (to prevent
+    needing to constantly reload and recalculate the model)
+    """
+    return pickle.dump(logit_model, open(path, 'w') )
+
+def find_jump_logit_method(price_df, threshold = .95):
     
-    
-    
+    ln_chg = price_df['Close'].div(price_df['Adj Close']).apply(numpy.log).diff()
     
 
 def test_jump_detection(ticker_list):
@@ -92,6 +105,7 @@ def test_jump_detection(ticker_list):
                 plt.axhline(y = wn_height, color = 'c', ls = '--',
                             label = "white noise method")
                 plt.title(ticker, fontsize = 16)
+                plt.legend(frameon = False)
                 plt.ylim(lims)
                 plt.show()
                 resp = raw_input("Do the limits need to be changed? y/n ")
