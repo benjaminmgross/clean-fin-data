@@ -14,10 +14,10 @@ import numpy
 import pandas
 import os
 import pandas.io.data
-import statsmodels.api as sm
+from statsmodels.api import Logit
 import matplotlib.pyplot as plt
 
-def trained_logistic_model():
+def trained_logit_model():
     """
     In 'data/traning_data/' specific ETFs were visually inspected and white noise (0)
     and not white noise (1) were assigned. This data is loaded here to train the
@@ -42,10 +42,10 @@ def trained_logistic_model():
     data['intercept'] = 1.0
 
     #fit the model
-    logit_model = sm.Logit(endog = data['Y'], exog = data[['ln_chg', 'intercept']])
+    logit_model = Logit(endog = data['Y'], exog = data[['intercept', 'ln_chg']])
     return logit_model.fit()
 
-def load_logit_model(path = '../data/training_data/logit_model')
+def load_logit_model(path = '../data/training_data/logit_model'):
     """
     Use the :module:`pickle` module to load the saved logit file
     """
@@ -58,9 +58,19 @@ def save_logit_model(logit_model, path):
     """
     return pickle.dump(logit_model, open(path, 'w') )
 
-def find_jump_logit_method(price_df, threshold = .95):
+def find_jump_logit_method(logit_model, price_df, threshold = .95):
+    """
+    Use the calibrated logit model to determine the threshold for dividends an splits
+    """
     
     ln_chg = price_df['Close'].div(price_df['Adj Close']).apply(numpy.log).diff()
+    data = pandas.DataFrame({'ln_chg':ln_chg, 'intercept':1.0})
+    
+    #because the order of the columns matters, it is forced intercept ln chg here
+    prob = logit_model.predict(data[['intercept', 'ln_chg']])
+
+    #because the values of ln_chg are all negative, the "smallest" is the max
+    return ln_chg[prob > threshold].max()
     
 
 def test_jump_detection(ticker_list):
@@ -82,15 +92,15 @@ def test_jump_detection(ticker_list):
 
         :class:`pandas.DataFrame` of tickers and whether or not the algorithm
         worked for each ticker based on the user responses.
-
-        
     """
     d = {}
+    logit_model = trained_logit_model()
     for ticker in ticker_list:
         incomplete = True
         price_df = tickers_to_dict(ticker)
         jump_height = find_jump_height(price_df)
         wn_height = find_wn_end(price_df)
+        logit_height = find_jump_logit_method(logit_model, price_df)
         lims = (-.01, .01)
 
         while incomplete:
@@ -99,11 +109,13 @@ def test_jump_detection(ticker_list):
                     price_df['Adj Close']).apply(numpy.log).diff()
                 threshold = ln_chg.mean() - ln_chg.std()*jump_height
                 fig = plt.plot()
-                ln_chg.plot()
+                ln_chg.plot(label = 'ln_chg')
                 plt.axhline(y = threshold, color = 'r', ls = '--',
                             label = "vol band method")
                 plt.axhline(y = wn_height, color = 'c', ls = '--',
                             label = "white noise method")
+                plt.axhline(y = logit_height, color = 'g', ls = '--',
+                            label = "trained logit method")
                 plt.title(ticker, fontsize = 16)
                 plt.legend(frameon = False)
                 plt.ylim(lims)
