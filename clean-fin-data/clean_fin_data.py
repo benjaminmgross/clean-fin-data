@@ -83,7 +83,7 @@ def find_jump_logit_method(logit_model, price_df, threshold = .95):
     
     return ln_chg[prob > threshold].max()
 
-def find_jump_time_interval(price_df, jump_method = 'logit'):
+def find_jump_time_interval(price_df, jump_method, logit_model = None):
     """
     Returns the median interval (in days) between jumps, using any of the three
     ``find_jump_*`` methods
@@ -94,18 +94,23 @@ def find_jump_time_interval(price_df, jump_method = 'logit'):
         'Adj Close'
 
         jump_method: :class:`string` of which jump method to use to find the dividends
-        and splits
+        and splits. Options are 'logit', 'vol', or 'wn'.
+
+        logit_model: :class:`statsmodels.api.Logit` already fitted for the data, in
+        the case that ``jump_method = 'logit'`` is used as the parameter
 
     :RETURNS:
 
         :class:`float` of the number of days between dividends and splits
-
-    
     """
+    thresh_dict = {'logit': lambda model, df: find_jump_vol_logit_method(model, df),
+                   'vol':lambda model, df: find_jump_vol_method(df),
+                   'wn': lambda model, df: find_jump_wn_method(df) }
+    threshold = threshold_dict[jump_method](
+        model = logit_model, df = price_df)
 
-    thresh = get_jump_stats(price_df)
-    jumps = ratio[(ratio > ratio.mean() + ratio.std()*thresh) | (
-        ratio < ratio.mean() - ratio.std()*thresh) ]
+    ln_chg = price_df['Close'].div(price_df['Adj Close']).apply(numpy.log).diff()
+    jumps = ln_chg[ ln_chg < threshold ]
 
     #find the distances between the jumps
     deltas = map(lambda x, y: x - y, jumps.index[1:], jumps.index[:-1] )
@@ -130,7 +135,7 @@ def find_jump_vol_method(price_df):
     
     """
     def __get_jump_stats(price_df):
-    """
+        """
         Helper function to determine the number of ratio changes that are outside a
         given volatility band.  Brute force algorithm
 
@@ -145,14 +150,14 @@ def find_jump_vol_method(price_df):
             showing the number of ratio changes that were outside of a given
             volatility band
     
-    """
-        ratio = price_df.loc[:, 'Close'].div(price_df.loc[:, 'Adj Close']).apply(
+        """
+        ratio = price_df['Close'].div(price_df['Adj Close']).apply(
             numpy.log).diff()
         vol_bands = numpy.linspace(.001, 2, 1000)
         bands = map(lambda x: len(ratio[(
             ratio.abs() > ratio.mean() + x*ratio.std() )]), vol_bands)
         return pandas.DataFrame({'num_outside': bands, 'vol_band':vol_bands})
-    
+
     if price_df['Close'].equals(price_df['Adj Close']):
         print "No Dividends or Splits, Adj Close and Close are all Equal"
         return 0.0
@@ -168,7 +173,9 @@ def find_jump_vol_method(price_df):
             band_cnt.index != min_out)].max()
         thr_ind = band_cnt[band_cnt == threshold].index
         agg = out_df.loc[out_df.num_outside == thr_ind[0],  :]
-        return agg['vol_band'].max()
+        thresh = agg['vol_band'].max()
+        ln_chg = price_df['Close'].div(price_df['Adj Close']).apply(numpy.log).diff()
+        return ln_chg.mean() - thresh * ln_chg.std()
 
 def find_jump_wn_method(price_df, threshold = .0001):
     """
@@ -212,9 +219,7 @@ def first_valid_date(prices):
 
     :RETURNS:
 
-        :class:`pandas.Timestamp`
-
-    
+        :class:`pandas.Timestamp` 
    """
     iter_dict = { pandas.DataFrame: lambda x: x.columns,
                   dict: lambda x: x.keys() } 
@@ -267,20 +272,16 @@ def gen_master_index(ticker_dict, n_min):
     return mi
 
 
-def get_divs_and_splits(price_df):
+def get_divs_and_splits(price_df, jump_method, logit_model = None):
 
+    thresh_dict = {
+        'logit': lambda model, df: find_jump_vol_logit_method(model, df),
+        'vol':lambda model, df: find_jump_vol_method(df),
+        'wn': lambda model, df: find_jump_wn_method(df)
+                   }
+
+    threshold = threshold_dict[jump_method](model = logit_model, df = price_df)
     ln_chg = price_df['Close'].div(price_df['Adj Close']).apply(numpy.log).diff()
-    
-    vol_thresh = ln_chg.mean() - ln_chg.std()*find_jump_vol_method(price_df)
-    wn_thresh =  find_wn_end(price_df)
-
-    #some of the values showed up as positive (as in 1) during my testing, so this
-    #makes sure it's either "the correct threshold" or one of the minimums
-    
-    if all(map(lambda x: x < 0., [wn_thresh, vol_thresh]) ):
-        thresh = max(wn_thresh, vol_thresh)
-    else:
-        thresh = min(wn_thresh, vol_thresh)
 
     return ln_chg[ln_chg < thresh]
 
@@ -416,19 +417,16 @@ def test_jump_detection_methods(ticker_list):
     for ticker in ticker_list:
         incomplete = True
         price_df = tickers_to_dict(ticker)
-        jump_height = find_jump_vol_method(price_df)
+        vol_height = find_jump_vol_method(price_df)
         wn_height = find_jump_wn_method(price_df)
         logit_height = find_jump_logit_method(logit_model, price_df)
         lims = (-.01, .01)
 
         while incomplete:
             try:
-                ln_chg = price_df['Close'].div(
-                    price_df['Adj Close']).apply(numpy.log).diff()
-                threshold = ln_chg.mean() - ln_chg.std()*jump_height
                 fig = plt.plot()
                 ln_chg.plot(label = 'ln_chg')
-                plt.axhline(y = threshold, color = 'r', ls = '--',
+                plt.axhline(y = vol_height, color = 'r', ls = '--',
                             label = "vol band method")
                 plt.axhline(y = wn_height, color = 'c', ls = '--',
                             label = "white noise method")
@@ -532,7 +530,6 @@ def update_store_prices(loc):
 
     store.close()
     return None
-
 
 def clean_existing_data(loc):
     hdf_store = pandas.HDFStore(path = loc, mode = 'r+')
