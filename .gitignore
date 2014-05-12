@@ -1,4 +1,5 @@
 *.pyc
 data/store.h5
+data/training_data/logistic_model
 scratch/
 .DS_Store
