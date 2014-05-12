@@ -61,6 +61,25 @@ def save_logit_model(logit_model, path):
 def find_jump_logit_method(logit_model, price_df, threshold = .95):
     """
     Use the calibrated logit model to determine the threshold for dividends an splits
+
+    :ARGS:
+
+        logit_model: :class:`statsmodels.api.Logit` that has already been fit to
+        dividends and splits.
+
+        .. seealso: `trained_logit_model()`
+
+        price_df: :class:`pandas.DataFrame` that have at least the columns 'Close' and
+        'Adj Close'
+
+        threshold: :class:`float` for the which, when a given value is  greater than
+        that probability, is considered "non-white noise"
+
+    :RETURNS:
+
+        :class:`float` of the threshold for the ``ln_chg`` for the ratio of that
+        ``price_df`` ('Close'/'Adj Close') is considered a dividend or split
+
     """
     
     ln_chg = price_df['Close'].div(price_df['Adj Close']).apply(numpy.log).diff()
@@ -70,6 +89,7 @@ def find_jump_logit_method(logit_model, price_df, threshold = .95):
     prob = logit_model.predict(data[['intercept', 'ln_chg']])
 
     #because the values of ln_chg are all negative, the "smallest" is the max
+    
     return ln_chg[prob > threshold].max()
     
 
