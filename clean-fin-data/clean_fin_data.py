@@ -53,65 +53,70 @@ def append_store_prices(ticker_list, loc, start = '01/01/1990'):
 
 def find_jump_logit_method(logit_model, price_df, threshold = .95):
     """
-    Use the calibrated logit model to determine the threshold for dividends an splits
+    Use the calibrated logit model to determine the threshold for 
+    dividends an splits
 
     :ARGS:
 
-        logit_model: :class:`statsmodels.api.Logit` that has already been fit to
-        dividends and splits.
+        logit_model: :class:`statsmodels.api.Logit` that has already been 
+        fit to dividends and splits.
 
         .. seealso: `get_trained_logit_model()`
 
-        price_df: :class:`pandas.DataFrame` that have at least the columns 'Close' and
-        'Adj Close'
+        price_df: :class:`pandas.DataFrame` that have at least the columns 
+        'Close' and 'Adj Close'
 
-        threshold: :class:`float` for the which, when a given value is  greater than
-        that probability, is considered "non-white noise"
+        threshold: :class:`float` for the which, when a given value is  
+        greater than that probability, is considered "non-white noise"
 
     :RETURNS:
 
-        :class:`float` of the threshold for the ``ln_chg`` for the ratio of that
-        ``price_df`` ('Close'/'Adj Close') is considered a dividend or split
+        :class:`float` of the threshold for the ``ln_chg`` for the ratio 
+        of that ``price_df`` ('Close'/'Adj Close') is considered a dividend 
+        or split
 
     """
     
-    ln_chg = price_df['Close'].div(price_df['Adj Close']).apply(numpy.log).diff()
-    data = pandas.DataFrame({'ln_chg':ln_chg, 'intercept':1.0})
-    
-    #because the order of the columns matters, it is forced intercept ln chg here
+    ln_chg = price_df['Close'].div(price_df['Adj Close']).apply(
+        numpy.log).diff()
+
+    data = pandas.DataFrame({'ln_chg':ln_chg, 'intercept':1.0})    
     prob = logit_model.predict(data[['intercept', 'ln_chg']])
 
-    #because the values of ln_chg are all negative, the "smallest" is the max
+    # the "smallest" is the max because all ln chg are negative
     
     return ln_chg[prob > threshold].max()
 
 def find_jump_time_interval(price_df, jump_method, logit_model = None):
     """
-    Returns the median interval (in days) between jumps, using any of the three
-    ``find_jump_*`` methods
+    Returns the median interval (in days) between jumps, using any of the 
+    three ``find_jump_*`` methods
 
     :ARGS:
 
-        price_df: :class:`pandas.DataFrame` with at least columns of 'Close' and
-        'Adj Close'
+        price_df: :class:`pandas.DataFrame` with at least columns of 'Close' 
+        and 'Adj Close'
 
-        jump_method: :class:`string` of which jump method to use to find the dividends
-        and splits. Options are 'logit', 'vol', or 'wn'.
+        jump_method: :class:`string` of which jump method to use to find 
+        the dividends and splits. Options are 'logit', 'vol', or 'wn'.
 
-        logit_model: :class:`statsmodels.api.Logit` already fitted for the data, in
-        the case that ``jump_method = 'logit'`` is used as the parameter
+        logit_model: :class:`statsmodels.api.Logit` already fitted for 
+        the data, in the case that ``jump_method = 'logit'`` is used as 
+        the parameter
 
     :RETURNS:
 
         :class:`float` of the number of days between dividends and splits
     """
-    thresh_dict = {'logit': lambda model, df: find_jump_vol_logit_method(model, df),
-                   'vol':lambda model, df: find_jump_vol_method(df),
-                   'wn': lambda model, df: find_jump_wn_method(df) }
+    thresh_dict = {'logit': lambda m, df: find_jump_vol_logit_method(m, df),
+                   'vol':lambda m, df: find_jump_vol_method(df),
+                   'wn': lambda m, df: find_jump_wn_method(df) }
     threshold = threshold_dict[jump_method](
         model = logit_model, df = price_df)
 
-    ln_chg = price_df['Close'].div(price_df['Adj Close']).apply(numpy.log).diff()
+    ln_chg = price_df['Close'].div(price_df['Adj Close']).apply(
+        numpy.log).diff()
+
     jumps = ln_chg[ ln_chg < threshold ]
 
     #find the distances between the jumps
@@ -121,36 +126,35 @@ def find_jump_time_interval(price_df, jump_method, logit_model = None):
 
 def find_jump_vol_method(price_df):
     """
-    Determines the appropriate vol band to determine when dividends and splits have
-    occured, in the case of missing data... i.e. the ugliest algorithm you've ever
-    seen to find the threshold level that defines dividends and splits
+    Determines the appropriate vol band to determine when dividends and 
+    splits have occured, in the case of missing data
 
     :ARGS:
 
-        price_df: :class:`pandas.DataFrame` that has columns of (at least) 'Close'
-        and 'Adj Close'
+        price_df: :class:`pandas.DataFrame` that has columns of (at least) 
+        'Close' and 'Adj Close'
 
     :RETURNS:
 
-        :class:`float` of the minimum volatility threshold for which jumps have
-        occurred
+        :class:`float` of the minimum volatility threshold for which 
+        jumps have occurred
     
     """
     def __get_jump_stats(price_df):
         """
-        Helper function to determine the number of ratio changes that are outside a
-        given volatility band.  Brute force algorithm
+        Helper function to determine the number of ratio changes that 
+        are outside a given volatility band.  Brute force algorithm
 
         :ARGS:
 
-            price_df: :class:`pandas.DataFrame` that has columns of (at least) 'Close'
-            and 'Adj Close'
+            price_df: :class:`pandas.DataFrame` that has columns of (at 
+            least) 'Close' and 'Adj Close'
 
         :RETURNS:
 
-            :class:`pandas.DataFrame` with columns 'num_outside' and 'vol_band'
-            showing the number of ratio changes that were outside of a given
-            volatility band
+            :class:`pandas.DataFrame` with columns 'num_outside' and 
+            'vol_band' showing the number of ratio changes that were 
+            outside of a given volatility band
     
         """
         ratio = price_df['Close'].div(price_df['Adj Close']).apply(
@@ -158,7 +162,8 @@ def find_jump_vol_method(price_df):
         vol_bands = numpy.linspace(.001, 2, 1000)
         bands = map(lambda x: len(ratio[(
             ratio.abs() > ratio.mean() + x*ratio.std() )]), vol_bands)
-        return pandas.DataFrame({'num_outside': bands, 'vol_band':vol_bands})
+        return pandas.DataFrame({'num_outside': bands, 
+                                 'vol_band':vol_bands})
 
     if price_df['Close'].equals(price_df['Adj Close']):
         print "No Dividends or Splits, Adj Close and Close are all Equal"
@@ -169,23 +174,26 @@ def find_jump_vol_method(price_df):
         band_cnt = out_df['num_outside'].value_counts()
         band_cnt.sort(ascending = False)
     
-        #determine the band, in units of volatility, where the jumps have occurred
-        max_out, min_out = out_df['num_outside'].max(), out_df['num_outside'].min()
+        #determine the band, in vol units, where the jumps have occurred
+        max_out = out_df['num_outside'].max()
+        min_out =   out_df['num_outside'].min()
         threshold = band_cnt[(band_cnt.index != max_out) & (
             band_cnt.index != min_out)].max()
         thr_ind = band_cnt[band_cnt == threshold].index
         agg = out_df.loc[out_df.num_outside == thr_ind[0],  :]
         thresh = agg['vol_band'].max()
-        ln_chg = price_df['Close'].div(price_df['Adj Close']).apply(numpy.log).diff()
+        ln_chg = price_df['Close'].div(price_df['Adj Close']).apply(
+            numpy.log).diff()
+
         return ln_chg.mean() - thresh * ln_chg.std()
 
 def find_jump_wn_method(price_df, threshold = .0001):
     """
-    Another way to approach the dividend / split recognition problem (instead of
-    incrementing the volatility band) is to sort ``ln_chg`` of the
-    :math:`\\frac{\\textrm{Close}}{\\textrm{Adj Close}}` and look for the first
-    jump that occurs. That is the end of the white noise and beginning of the data
-    we're looking for
+    Another way to approach the dividend / split recognition problem 
+    (instead of incrementing the volatility band) is to sort ``ln_chg`` 
+    of the :math:`\\frac{\\textrm{Close}}{\\textrm{Adj Close}}` and 
+    look for the first jump that occurs. That is the end of the white 
+    noise and beginning of the data we're looking for
 
     :ARGS:
 
@@ -195,13 +203,15 @@ def find_jump_wn_method(price_df, threshold = .0001):
 
         the distance for which dividends or / and splits begin to occur
     """
-    ln_chg = price_df['Close'].div(price_df['Adj Close']).apply(numpy.log).diff()
+    ln_chg = price_df['Close'].div(price_df['Adj Close']).apply(
+        numpy.log).diff()
+
     abs_sorted = ln_chg.abs()
     abs_sorted.sort(ascending = True)
     jump_size = abs_sorted.diff()
     
-    #the first jump over the threshold is our bogey, but need to transform back to
-    #the original ln_chg value
+    #the first jump over the threshold is our bogey, but need to 
+    #transform back to the original ln_chg value
     try:
         return ln_chg[jump_size[jump_size > threshold].argmin()]
     except ValueError:
@@ -210,9 +220,10 @@ def find_jump_wn_method(price_df, threshold = .0001):
 
 def first_valid_date(prices):
     """
-    Helper function to determine the first valid date from a set of different prices
-    Can take either a :class:`dict` of :class:`pandas.DataFrame`s where each key is a
-    ticker's 'Open', 'High', 'Low', 'Close', 'Adj Close' or a single
+    Helper function to determine the first valid date from a set of 
+    different prices Can take either a :class:`dict` of 
+    :class:`pandas.DataFrame`s where each key is a ticker's 'Open', 
+    'High', 'Low', 'Close', 'Adj Close' or a single 
     :class:`pandas.DataFrame` where each column is a different ticker
 
     :ARGS:
@@ -236,16 +247,16 @@ def first_valid_date(prices):
 
 def gen_master_index(ticker_dict, n_min):
     """
-    Because many tickers have missing data in one or two spots, this function
-    aggregates ``n_min`` indexes to determine a Master Index ("MI").
+    Because many tickers have missing data in one or two spots, this 
+    function aggregates ``n_min`` indexes to determine a Master Index.
 
     :ARGS:
 
-        ticker_dict: :class:`dictionary` with tickers for keys and price data for
-        values
+        ticker_dict: :class:`dictionary` with tickers for keys and price 
+        data for values
 
-        n_min: :class:integer of the minimum number of indexes to use before "all
-        dates" have been determined
+        n_min: :class:integer of the minimum number of indexes to use 
+        before "all dates" have been determined
 
     :RETURNS:
 
@@ -253,24 +264,27 @@ def gen_master_index(ticker_dict, n_min):
     """
     
     #create a sorted Series of the tickers and the dates they begin
-    dt_starts = pandas.Series( map(lambda x: ticker_dict[x].dropna().index.min(),
+    dt_starts = pandas.Series( 
+        map(lambda x: ticker_dict[x].dropna().index.min(),
         ticker_dict.keys()), index = ticker_dict.keys() )
     dt_starts.sort()
 
-    #check to make sure the tickers end on the same date (or MI doesn't work)
-    end_dates = pandas.Series( map( lambda x: ticker_dict[x].dropna().index.max(),
-                     ticker_dict.keys()), index = ticker_dict.keys() )
+    #check to make sure the tickers end on the same date
+    end_dates = pandas.Series(
+        map( lambda x: ticker_dict[x].dropna().index.max(),
+        ticker_dict.keys()), index = ticker_dict.keys() )
 
     end_dates = end_dates[dt_starts.index]
     
     if (end_dates[:n_min] == end_dates[0]).all() == False:
-        print "Terminal Values are not the same and Master Index won't work"
+        print "final dates aren't the same, Master Index won't work"
         return
 
     else:
         #find the union of the first n_min indexes
-        mi = reduce(lambda x, y: x | y, map(lambda x: ticker_dict[x].dropna().index,
-                                          dt_starts[:n_min].index) )
+        mi = reduce(lambda x, y: x | y, map(
+            lambda x: ticker_dict[x].dropna().index,
+            dt_starts[:n_min].index) )
     return mi
 
 
@@ -282,17 +296,20 @@ def get_divs_and_splits(price_df, jump_method, logit_model = None):
         'wn': lambda model, df: find_jump_wn_method(df)
                    }
 
-    threshold = threshold_dict[jump_method](model = logit_model, df = price_df)
-    ln_chg = price_df['Close'].div(price_df['Adj Close']).apply(numpy.log).diff()
+    threshold = threshold_dict[jump_method](model = logit_model, 
+                                            df = price_df)
+
+    ln_chg = price_df['Close'].div(price_df['Adj Close']).apply(
+        numpy.log).diff()
 
     return ln_chg[ln_chg < thresh]
 
 def get_trained_logit_model():
     """
-    In 'data/traning_data/' specific ETFs were visually inspected and white noise (0)
-    and not white noise (1) were assigned. This data is loaded here to train the
-    logistic parameters, but you can use this functionality as a template to train
-    your own
+    In 'data/traning_data/' specific ETFs were visually inspected and 
+    white noise (0) and not white noise (1) were assigned. This data is 
+    loaded here to train the logistic parameters, but you can use this 
+    functionality as a template to train your own
 
     :ARGS:
 
@@ -300,19 +317,20 @@ def get_trained_logit_model():
 
     :RETURNS:
 
-        a fitted :class:`statsmodels.Logit` Logistic regression that has been fit to
-        the trained data
+        a fitted :class:`statsmodels.Logit` Logistic regression that 
+        has been fit to the trained data
     """
     f = pandas.ExcelFile('../data/training_data/Trained Data.xlsx')
-    data = reduce(lambda a, b: numpy.vstack([ a, b]), 
-        map(lambda x: f.parse(x, index_col = 0)[['ln_chg', 'Y']], f.sheet_names))
+    data = reduce(lambda a, b: numpy.vstack([ a, b]), map(
+        lambda x: f.parse(x, index_col = 0)[['ln_chg', 'Y']], f.sheet_names))
     data = pandas.DataFrame(data, columns = ['ln_chg', 'Y'])
 
     #add an intercept for the model (required by statsmodels.api.Logit
     data['intercept'] = 1.0
 
     #fit the model
-    logit_model = Logit(endog = data['Y'], exog = data[['intercept', 'ln_chg']])
+    logit_model = Logit(endog = data['Y'], 
+                        exog = data[['intercept', 'ln_chg']])
     return logit_model.fit()
 
 def initialize_data_to_store(ticker_list, loc, 
@@ -589,11 +607,13 @@ if __name__ == '__main__':
     
     usage = sys.argv[0] + "usage instructions"
     description = "describe the function"
-    parser = argparse.ArgumentParser(description = description, usage = usage)
-    parser.add_argument('name_1', nargs = 1, type = str, help = 'describe input 1')
+    parser = argparse.ArgumentParser(description = description, 
+                                     usage = usage)
+    parser.add_argument('name_1', nargs = 1, type = str, 
+                        help = 'describe input 1')
+
     parser.add_argument('name_2', nargs = '+', type = int,
                         help = "describe input 2")
-
     args = parser.parse_args()
     
     script_function(input_1 = args.name_1[0], input_2 = args.name_2)
