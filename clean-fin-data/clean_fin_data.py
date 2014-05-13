@@ -19,22 +19,24 @@ import matplotlib.pyplot as plt
 
 def append_store_prices(ticker_list, loc, start = '01/01/1990'):
     """
-    Given an existing store located at ``loc``, check to make sure the
-    tickers in ``ticker_list`` are not already in the data set, and then
-    insert the tickers into the store.
+    Given an existing store located at ``loc``, check to make sure
+    the tickers in ``ticker_list`` are not already in the data
+    set, and then insert the tickers into the store.
 
     :ARGS:
 
-        ticker_list: :class:`list` of tickers to add to the :class:`pandas.HDStore`
+        ticker_list: :class:`list` of tickers to add to the
+        :class:`pandas.HDStore`
 
-        loc: :class:`string` of the path to the :class:`pandas.HDStore`
+        loc: :class:`string` of the path to the     
+        :class:`pandas.HDStore`
 
         start: :class:`string` of the date to begin the price data
 
     :RETURNS:
 
-        :class:`NoneType` but appends the store and comments the successes
-        ands failures
+        :class:`NoneType` but appends the store and comments the
+         successes ands failures
     """
     try:
         store = pandas.HDFStore(path = loc, mode = 'r')
@@ -313,20 +315,25 @@ def get_trained_logit_model():
     logit_model = Logit(endog = data['Y'], exog = data[['intercept', 'ln_chg']])
     return logit_model.fit()
 
-def initialize_data_to_store(ticker_list, loc, start = '01/01/1990'):
+def initialize_data_to_store(ticker_list, loc, 
+                             start = '01/01/1990'):
     """
-    Initialization to pull down data, and store in ``HDF5`` file format.  This
-    function should be used "the first time" a ``store`` is created, later using
-    different update functionality.  Function will exist if a file with that name
+    Initialization to pull down data, and store in ``HDF5`` file 
+    format.  This function should be used "the first time" a 
+    ``store`` is created, later using different update 
+    functionality.  Function will exist if a file with that name 
     already exists.
 
     :ARGS:
 
-        ticker_list: iterable for which you'd like to pull down financial data for
+        ticker_list: iterable for which you'd like to pull down 
+        financial data for
 
-        loc: :class:`string` location to store the ``HDF5`` data type
+        loc: :class:`string` location to store the ``HDF5``data  
+        type
 
-        start: :class:`string` when you would like the price data to begin
+        start: :class:`string` when you would like the price data 
+        to begin
 
     :RETURNS:
 
@@ -334,13 +341,15 @@ def initialize_data_to_store(ticker_list, loc, start = '01/01/1990'):
 
     .. note:: Will Not Overwite Existing File
 
-        If a file already exists with that path, the function will not overwite
-        that file -- and therefore must be deleted manually outside of the program
-        in order for the function to run.
+        If a file already exists with that path, the function will
+        not overwite that file -- and therefore must be deleted 
+        manually outside of the program in order for the function
+        to run.
 
     .. note:: Master Index
 
-        Each store that is created gets a key of "Master Index" that indicates
+        Each store that is created gets a key of "Master Index" 
+        that indicates
         
     """
     if os.path.isfile(loc) == False:
@@ -348,6 +357,7 @@ def initialize_data_to_store(ticker_list, loc, start = '01/01/1990'):
         master_index = gen_master_index(d, n_min = 5)
         store = pandas.HDFStore(path = loc, mode = 'w')
         map(lambda x: store.put(x, d[x] ), ticker_list)
+        master_index = pandas.Series(index = master_index)
         store.put("master_index", master_index)
         store.close()
     else:
@@ -356,14 +366,15 @@ def initialize_data_to_store(ticker_list, loc, start = '01/01/1990'):
 
 def is_key_in_store(loc, key):
     """
-    A quick check to determine whether the :class:`pandas.HDFStore` has data
-    for ``key``
+    A quick check to determine whether the :class:`pandas.HDFStore` 
+    has datA for ``key``
 
     :ARGS:
 
         loc: :class:`string` of path to :class:`pandas.HDFStore`
 
-        key: :class:`string` of the ticker to check if currently available
+        key: :class:`string` of the ticker to check if currently 
+        available
 
     :RETURNS:
 
@@ -387,30 +398,31 @@ def load_logit_model(path = '../data/training_data/logit_model'):
 
 def save_logit_model(logit_model, path):
     """
-    Use the :module"`pickle` module to save the logit regression model (to prevent
-    needing to constantly reload and recalculate the model)
+    Use the :module"`pickle` module to save the logit regression model 
+    (to prevent needing to constantly reload and recalculate the model)
     """
     return pickle.dump(logit_model, open(path, 'w') )
 
 def test_jump_detection_methods(ticker_list):
     """
     To determine the efficacy of the algorithms by looking at ``ln_chg``
-    graphs of several different tickers and see where each threshold is drawn for
-    the two different algorithms.
+    graphs of several different tickers and see where each threshold is
+    drawn for the two different algorithms.
 
-    This function iterates over a givenlist of tickers, ``ticker_list`` while asking
-    the user for input whether or not the algorithm "appeared to work," and returns
-    the yes / no results for each ticker into a :class:`pandas.DataFrame`.
+    This function iterates over a givenlist of tickers, ``ticker_list`` 
+    while asking the user for input whether or not the algorithm 
+    "appeared to work," and returns the yes / no results for each 
+    ticker into a :class:`pandas.DataFrame`.
 
     :ARGS:
 
-        tick_list: :class:`list` or iterable of tickers to test the dividend and
-        split identification algorithm
+        tick_list: :class:`list` or iterable of tickers to test the 
+        dividend and split identification algorithm
 
     :RETURNS:
 
-        :class:`pandas.DataFrame` of tickers and whether or not the algorithm
-        worked for each ticker based on the user responses.
+        :class:`pandas.DataFrame` of tickers and whether or not the 
+        algorithm worked for each ticker based on the user responses.
     """
     d = {}
     logit_model = get_trained_logit_model()
@@ -436,10 +448,12 @@ def test_jump_detection_methods(ticker_list):
                 plt.legend(frameon = False)
                 plt.ylim(lims)
                 plt.show()
-                resp = raw_input("Do the limits need to be changed? y/n ")
+                resp = raw_input(
+                    "Do the limits need to be changed? y/n ")
                 
                 if resp == 'y':
-                    lims = raw_input("What are the new limits? ymin, ymax ")
+                    lims = raw_input(
+                        "What are the new limits? ymin, ymax ")
                     lims = map(lambda x: float(x), lims.split(',') )
                 else:
                     didwork = raw_input("Did the algorithm work? y/n " )
@@ -454,23 +468,24 @@ def test_jump_detection_methods(ticker_list):
 
 def tickers_to_dict(ticker_list, api = 'yahoo', start = '01/01/1990'):
     """
-    Utility function to return ticker data where the input is either a ticker,
-    or a list of tickers.
+    Utility function to return ticker data where the input is either a 
+    ticker, or a list of tickers.
 
     :ARGS:
 
-        ticker_list: :class:`list` in the case of multiple tickers or :class:`str`
-        in the case of one ticker
+        ticker_list: :class:`list` in the case of multiple tickers or 
+        :class:`str` in the case of one ticker
 
-        api: :class:`string` identifying which api to call the data from.  Either
-        'yahoo' or 'google'
+        api: :class:`string` identifying which api to call the data 
+        from.  Either 'yahoo' or 'google'
 
         start: :class:`string` of the desired start date
                 
     :RETURNS:
 
         :class:`dictionary` of (ticker, price_df) mappings or a
-        :class:`pandas.DataFrame` when the ``ticker_list`` is :class:`str`
+        :class:`pandas.DataFrame` when the ``ticker_list`` is 
+        :class:`str`
     """
     def __get_data(ticker, api, start):
         reader = pandas.io.data.DataReader
@@ -491,8 +506,8 @@ def tickers_to_dict(ticker_list, api = 'yahoo', start = '01/01/1990'):
 
 def update_store_prices(loc):
     """
-    Update to the most recent prices for all keys of an existing store, located at
-    path ``loc``.
+    Update to the most recent prices for all keys of an existing store, 
+    located at path ``loc``.
 
     :ARGS:
 
@@ -500,8 +515,8 @@ def update_store_prices(loc):
 
     :RETURNS:
 
-        :class:`NoneType` but updates the ``HDF5`` file, and prints to screen
-        which values would not update
+        :class:`NoneType` but updates the ``HDF5`` file, and prints to 
+        screen which values would not update
 
     """
     reader = pandas.io.data.DataReader
@@ -523,7 +538,8 @@ def update_store_prices(loc):
                 tmp = reader(key.strip('/'), 'yahoo', start = strftime(
                     last_stored_date, format = '%m/%d/%Y'))
 
-                #need to drop duplicates because there's 1 row of overlap
+                #need to drop duplicates because there's 1 row of 
+                #overlap
                 store.put(key, stored_data.append(tmp).drop_duplicates())
             except IOError:
                 print "could not update " + key
@@ -536,16 +552,21 @@ def clean_existing_data(loc):
     return None
     
 def clean_df_data_gaps(price_frame, master_index, ticker):
-    #the starting date is the greater of the master index start or stock start
+    
+    #the starting date is the more recent of the master index start or 
+    #stock start
     d_o = max([price_frame.dropna().index.min(), master_index.min()])
 
     #if there are no gaps, somply return and don't alter the data
-    if price_frame.loc[d_o:].index.equals(master_index[master_index.get_loc(d_o):]):
+    if price_frame.loc[d_o:].index.equals(
+            master_index[master_index.get_loc(d_o):]):
         print "No data gaps found for " + ticker
         return
     #otherwise, fill the gaps with Google data
     else:
         plug_data = tickers_to_dict(ticker, api = 'google', start = d_o)
+
+        #find the gaps
 
         #fill the gaps
     return None
