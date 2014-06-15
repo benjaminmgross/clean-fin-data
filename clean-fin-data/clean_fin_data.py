@@ -39,11 +39,11 @@ def append_store_prices(ticker_list, loc, start = '01/01/1990'):
          successes ands failures
     """
     try:
-        store = pandas.HDFStore(path = loc, mode = 'r')
+        store = pandas.HDFStore(path = loc, mode = 'a')
     except IOError:
         print  loc + " is not a valid path to an HDFStore Object"
         return
-    store_keys = map(lambda x: x.split('/'), store.keys())
+    store_keys = map(lambda x: x.strip('/'), store.keys())
     not_in_store = numpy.setdiff1d(ticker_list, store_keys )
 
     new_prices = tickers_to_dict(not_in_store, start = start)
